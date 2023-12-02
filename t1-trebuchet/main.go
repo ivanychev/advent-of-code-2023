@@ -1,6 +1,7 @@
 package main
 
 import (
+	"advent_of_code/common"
 	"bufio"
 	"fmt"
 	"github.com/dlclark/regexp2"
@@ -50,18 +51,6 @@ func WriteItemsToFile[T any](path string, items []T) {
 	}
 }
 
-type Number interface {
-	int
-}
-
-func sum[T Number](items []T) T {
-	result := *new(T)
-	for _, item := range items {
-		result += item
-	}
-	return result
-}
-
 // Part 1
 
 //func main() {
@@ -98,5 +87,5 @@ func main() {
 		},
 	})
 	calNumbers := GetCalibrationNumbers(numbers)
-	WriteItemsToFile("/Users/iv/Code/advent-of-code-2023/t1-trebuchet/2-output.txt", []int{sum(calNumbers)})
+	WriteItemsToFile("/Users/iv/Code/advent-of-code-2023/t1-trebuchet/2-output.txt", []int{common.Sum(calNumbers)})
 }
