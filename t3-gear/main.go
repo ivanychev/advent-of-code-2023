@@ -10,6 +10,8 @@ import (
 	"unicode"
 )
 
+const GEAR = '*'
+
 type Schematic struct {
 	Rows []string
 }
@@ -100,6 +102,35 @@ func IsPartNumber(n Number, s Schematic) bool {
 	return false
 }
 
+func AdjacentGears(n Number, s Schematic) []Coord {
+	var coords []Coord
+	for _, coord := range AdjacentCells(n, s) {
+		if s.Rows[coord.Y][coord.X] == GEAR {
+			coords = append(coords, coord)
+		}
+	}
+	return coords
+}
+
+//func main() {
+//	rows, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t3-gear/1.txt")
+//	if err != nil {
+//		log.Fatalf("Failed to read file: %w", err)
+//	}
+//	numbersRe := regexp2.MustCompile("\\d+", regexp2.IgnoreCase)
+//	schematic := Schematic{Rows: rows}
+//	numbers := lo.FlatMap(schematic.Rows, func(item string, index int) []Number {
+//		return ExtractNumbersFromRow(item, index, numbersRe)
+//	})
+//	partNumbers := lo.Filter(numbers, func(item Number, index int) bool {
+//		return IsPartNumber(item, schematic)
+//	})
+//	sum := lo.SumBy(partNumbers, func(item Number) int64 {
+//		return int64(item.Value)
+//	})
+//	fmt.Printf("Total sum: %v", sum)
+//}
+
 func main() {
 	rows, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t3-gear/1.txt")
 	if err != nil {
@@ -110,11 +141,20 @@ func main() {
 	numbers := lo.FlatMap(schematic.Rows, func(item string, index int) []Number {
 		return ExtractNumbersFromRow(item, index, numbersRe)
 	})
-	partNumbers := lo.Filter(numbers, func(item Number, index int) bool {
-		return IsPartNumber(item, schematic)
-	})
-	sum := lo.SumBy(partNumbers, func(item Number) int64 {
-		return int64(item.Value)
-	})
-	fmt.Printf("Total sum: %v", sum)
+
+	var gearToNumbers = make(map[Coord][]Number)
+	for _, n := range numbers {
+		gearCoords := AdjacentGears(n, schematic)
+		for _, coord := range gearCoords {
+			gearToNumbers[coord] = append(gearToNumbers[coord], n)
+		}
+	}
+
+	total := int64(0)
+	for _, adjNumbers := range gearToNumbers {
+		if len(adjNumbers) == 2 {
+			total += int64(adjNumbers[0].Value) * int64(adjNumbers[1].Value)
+		}
+	}
+	fmt.Printf("Total: %v\n", total)
 }
