@@ -3,7 +3,10 @@ package common
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
+	"strconv"
+	"strings"
 )
 
 type Number interface {
@@ -37,4 +40,17 @@ func FileToRows(path string) ([]string, error) {
 		lines = append(lines, fileScanner.Text())
 	}
 	return lines, nil
+}
+
+func StringOfNumbersToInts(s string) []int {
+	parts := strings.Fields(s)
+	var returned = make([]int, 0, len(parts))
+	for _, part := range parts {
+		val, err := strconv.Atoi(part)
+		if err != nil {
+			log.Fatalf("Failed to parse int: %s", part)
+		}
+		returned = append(returned, val)
+	}
+	return returned
 }
