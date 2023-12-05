@@ -21,6 +21,20 @@ func Sum[T Number](items []T) T {
 	return result
 }
 
+func MaxPair[T Number](a, b T) T {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func MinPair[T Number](a, b T) T {
+	if a > b {
+		return b
+	}
+	return a
+}
+
 func NoIndex[T, R any](f func(T) R) func(T, int) R {
 	return func(t T, _ int) R {
 		return f(t)
