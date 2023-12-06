@@ -9,24 +9,35 @@ import (
 )
 
 type LapRecord struct {
-	Time     int
-	Distance int
+	Time     int64
+	Distance int64
 }
 
 type Run struct {
-	WaitFor int
-	RunFor  int
+	WaitFor int64
+	RunFor  int64
 }
 
 func (r LapRecord) RecordBeats() []Run {
 	runs := make([]Run, 0)
-	for wait := 1; wait <= r.Time-1; wait++ {
+	for wait := int64(1); wait <= r.Time-1; wait++ {
 		run := r.Time - wait
 		if run*wait > r.Distance {
 			runs = append(runs, Run{wait, run})
 		}
 	}
 	return runs
+}
+
+func (r LapRecord) RecordBeatCount() int64 {
+	beats := int64(0)
+	for wait := int64(1); wait <= r.Time-1; wait++ {
+		run := r.Time - wait
+		if run*wait > r.Distance {
+			beats++
+		}
+	}
+	return beats
 }
 
 func ReadRecords(path string) []LapRecord {
@@ -41,20 +52,20 @@ func ReadRecords(path string) []LapRecord {
 	distances := common.StringOfNumbersToInts(rawDistances)
 	runs := make([]LapRecord, 0, len(times))
 	for i, t := range times {
-		runs = append(runs, LapRecord{Time: t, Distance: distances[i]})
+		runs = append(runs, LapRecord{Time: int64(t), Distance: int64(distances[i])})
 	}
 	return runs
 }
 
 func main() {
-	runs := ReadRecords("/Users/iv/Code/advent-of-code-2023/t6-wait/1.txt")
-	recordBeats := lo.Map(runs, func(r LapRecord, index int) []Run {
-		return r.RecordBeats()
+	runs := ReadRecords("/Users/iv/Code/advent-of-code-2023/t6-wait/2.txt")
+	recordBeats := lo.Map(runs, func(r LapRecord, index int) int64 {
+		return r.RecordBeatCount()
 	})
 
-	multiplied := lo.Reduce(recordBeats, func(agg int, r []Run, index int) int {
-		return agg * len(r)
-	}, 1)
+	multiplied := lo.Reduce(recordBeats, func(agg int64, r int64, index int) int64 {
+		return agg * r
+	}, int64(1))
 
 	fmt.Printf("Multiplied: %+v\n", multiplied)
 }
