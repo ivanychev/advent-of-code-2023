@@ -63,12 +63,13 @@ func RuneToCard(r rune) Card {
 }
 
 type Hand struct {
-	RawCards       string
-	Cards          []Card
-	CardsCombined  string
-	CardCounts     map[Card]int
-	CountsCombined string
-	Bid            int
+	RawCards                string
+	Cards                   []Card
+	CardsCombined           string
+	CardCounts              map[Card]int
+	CountsCombined          string
+	CountsWithJokerCombined string
+	Bid                     int
 }
 
 func ParseHand(rawHand string) Hand {
@@ -89,8 +90,24 @@ func ParseHand(rawHand string) Hand {
 	countsCombined := strings.Join(lo.Map(counts, func(c int, index int) string {
 		return fmt.Sprintf("%d", c)
 	}), "")
+
+	jokerCountsCombined := countsCombined
+	if jokerCount, ok := cardCounts[C_J]; ok {
+		jokerCountsCombined = strings.Replace(countsCombined, fmt.Sprintf("%d", jokerCount), "", 1)
+		if len(jokerCountsCombined) > 0 {
+			firstCount, _ := strconv.Atoi(jokerCountsCombined[0:1])
+			firstCount += jokerCount
+			jokerCountsCombined = strings.Replace(jokerCountsCombined, jokerCountsCombined[0:1], fmt.Sprintf("%d", firstCount), 1)
+		} else {
+			// There was only "5" of jokers
+			jokerCountsCombined = countsCombined
+		}
+
+	}
+
 	return Hand{RawCards: rawComponents[0], Cards: cards, CardCounts: cardCounts, Bid: bid,
-		CountsCombined: countsCombined, CardsCombined: cardsCombined}
+		CountsCombined: countsCombined, CardsCombined: cardsCombined,
+		CountsWithJokerCombined: jokerCountsCombined}
 }
 
 func CompareHands(a, b Hand) int {
@@ -101,13 +118,39 @@ func CompareHands(a, b Hand) int {
 	return utils.StringComparator(a.CardsCombined, b.CardsCombined)
 }
 
+func CompareHandsJoker(a, b Hand) int {
+	compareHandCounts := utils.StringComparator(a.CountsWithJokerCombined, b.CountsWithJokerCombined)
+	if compareHandCounts != 0 {
+		return compareHandCounts
+	}
+	aStr := strings.Replace(a.CardsCombined, string(rune(C_J)), "1", -1)
+	bStr := strings.Replace(b.CardsCombined, string(rune(C_J)), "1", -1)
+	return utils.StringComparator(aStr, bStr)
+}
+
+// Part 1
+//func main() {
+//	rawBids, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t7-camel/1.txt")
+//	if err != nil {
+//		log.Fatalf("Failed to read file %w", err)
+//	}
+//	hands := lo.Map(rawBids, common.NoIndex(ParseHand))
+//	slices.SortFunc(hands, CompareHands)
+//	winnings := lo.Map(hands, func(h Hand, index int) int64 {
+//		return int64(index+1) * int64(h.Bid)
+//	})
+//
+//	fmt.Printf("%+v", lo.Sum(winnings))
+//}
+
+// Part 2
 func main() {
 	rawBids, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t7-camel/1.txt")
 	if err != nil {
 		log.Fatalf("Failed to read file %w", err)
 	}
 	hands := lo.Map(rawBids, common.NoIndex(ParseHand))
-	slices.SortFunc(hands, CompareHands)
+	slices.SortFunc(hands, CompareHandsJoker)
 	winnings := lo.Map(hands, func(h Hand, index int) int64 {
 		return int64(index+1) * int64(h.Bid)
 	})
