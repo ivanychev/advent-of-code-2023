@@ -157,6 +157,45 @@ func stepsToReachAll(currentEdges []*Edge, commands []byte) int {
 	return totalSteps
 }
 
+type EdgeStep struct {
+	e              *Edge
+	commandPointer int64
+}
+
+type CycleInfo struct {
+	firstEncounterSteps  int64
+	secondEncounterSteps int64
+	commandPointer       int64
+	edge                 *Edge
+}
+
+func findCycle(e *Edge, commands []byte) CycleInfo {
+	commandPointer := int64(0)
+	totalSteps := int64(0)
+	edgesSet := make(map[EdgeStep]int64)
+	edgesSet[EdgeStep{e, totalSteps}] = int64(0)
+	for {
+		if commands[commandPointer] == 'L' {
+			e = e.left
+		} else {
+			e = e.right
+		}
+		commandPointer = (commandPointer + 1) % int64(len(commands))
+		totalSteps++
+		es := EdgeStep{e, commandPointer}
+		if firstEncounterSteps, exists := edgesSet[es]; exists {
+			return CycleInfo{
+				firstEncounterSteps:  firstEncounterSteps,
+				secondEncounterSteps: totalSteps,
+				commandPointer:       commandPointer,
+				edge:                 e,
+			}
+		} else {
+			edgesSet[es] = totalSteps
+		}
+	}
+}
+
 func main() {
 	nameToEdge, commands := createEdgesAndCommands("/Users/iv/Code/advent-of-code-2023/t8-haunted/1.txt")
 
@@ -164,6 +203,7 @@ func main() {
 		return item.name[LAST] == 'A'
 	})
 	fmt.Printf("Found %d edges\n", len(edges))
-
-	fmt.Printf("%d", stepsToReachAll(edges, commands))
+	for _, edge := range edges {
+		fmt.Printf("%+v\n", findCycle(edge, commands))
+	}
 }
