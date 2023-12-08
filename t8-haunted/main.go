@@ -2,11 +2,25 @@ package main
 
 import (
 	"fmt"
+	"github.com/samber/lo"
 	"io"
 	"log"
 	"os"
 	"strings"
 )
+
+func Gcd(a, b int64) int64 {
+	for b != 0 {
+		a, b = b, a%b
+	}
+	return a
+}
+
+func Lcm(a, b int64) int64 {
+	return a * b / Gcd(a, b)
+}
+
+const LAST = 2
 
 type Edge struct {
 	name  string
@@ -61,12 +75,42 @@ func createEdgesAndCommands(path string) (map[string]*Edge, []byte) {
 	return nameToEdge, commands
 }
 
-func main() {
-	nameToEdge, commands := createEdgesAndCommands("/Users/iv/Code/advent-of-code-2023/t8-haunted/1.txt")
+//func main() {
+//	nameToEdge, commands := createEdgesAndCommands("/Users/iv/Code/advent-of-code-2023/t8-haunted/1.txt")
+//
+//	currentStep := -1
+//	totalSteps := 0
+//	currentEdge := nameToEdge["AAA"]
+//	for {
+//		currentStep = (currentStep + 1) % len(commands)
+//		totalSteps += 1
+//		switch commands[currentStep] {
+//		case 'L':
+//			currentEdge = currentEdge.left
+//		case 'R':
+//			currentEdge = currentEdge.right
+//		default:
+//			fmt.Errorf("Invalid command %c", commands[currentStep])
+//		}
+//		if currentEdge.name == "ZZZ" {
+//			break
+//		}
+//	}
+//	fmt.Printf("%d", totalSteps)
+//}
 
+func allEnding(edges []*Edge) bool {
+	for _, e := range edges {
+		if e.name[LAST] != 'Z' {
+			return false
+		}
+	}
+	return true
+}
+
+func stepsToReach(currentEdge *Edge, commands []byte) int {
 	currentStep := -1
 	totalSteps := 0
-	currentEdge := nameToEdge["AAA"]
 	for {
 		currentStep = (currentStep + 1) % len(commands)
 		totalSteps += 1
@@ -82,5 +126,44 @@ func main() {
 			break
 		}
 	}
-	fmt.Printf("%d", totalSteps)
+	return totalSteps
+}
+
+func stepsToReachAll(currentEdges []*Edge, commands []byte) int {
+	currentStep := -1
+	totalSteps := 0
+	for {
+		currentStep = (currentStep + 1) % len(commands)
+		totalSteps += 1
+		switch commands[currentStep] {
+		case 'L':
+			currentEdges = lo.Map(currentEdges, func(e *Edge, index int) *Edge {
+				return e.left
+			})
+		case 'R':
+			currentEdges = lo.Map(currentEdges, func(e *Edge, index int) *Edge {
+				return e.right
+			})
+		default:
+			fmt.Errorf("Invalid command %c", commands[currentStep])
+		}
+		if allEnding(currentEdges) {
+			break
+		}
+		if totalSteps%30000000 == 0 {
+			fmt.Printf("Done %d iterations\n", totalSteps)
+		}
+	}
+	return totalSteps
+}
+
+func main() {
+	nameToEdge, commands := createEdgesAndCommands("/Users/iv/Code/advent-of-code-2023/t8-haunted/1.txt")
+
+	edges := lo.Filter(lo.Values(nameToEdge), func(item *Edge, index int) bool {
+		return item.name[LAST] == 'A'
+	})
+	fmt.Printf("Found %d edges\n", len(edges))
+
+	fmt.Printf("%d", stepsToReachAll(edges, commands))
 }
