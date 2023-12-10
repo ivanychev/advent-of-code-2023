@@ -295,7 +295,7 @@ func main() {
 	//moveTo := DOWN
 	rows, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t10-pipes/1.txt")
 	startIsRune := UD
-	moveTo := UP
+	moveTo := DOWN
 	if err != nil {
 		log.Fatalf("Failed to open file: %w", err)
 	}
@@ -307,30 +307,13 @@ func main() {
 	field := Field{tiles: tiles, startingCoord: startingCoord}
 
 	tileSet := scanCycleTiles(startingCoord, field, moveTo)
-	startingCoords := make([]Coord, 0)
-	for x := 0; x < field.LenX(); x++ {
-		startingCoords = append(startingCoords, Coord{x, 0})
-	}
-	for y := 1; y < field.LenX(); y++ {
-		startingCoords = append(startingCoords, Coord{0, y})
-	}
-	inLoop := 0
-	for _, start := range startingCoords {
-		delta := 0
-		intersections := 0
-		for start.x+delta < field.LenX() && start.y+delta < field.LenY() {
-			coord := Coord{start.x + delta, start.y + delta}
-			if _, partOfCycle := tileSet[coord]; partOfCycle {
-				tile := field.tiles[coord.y][coord.x]
-				if tile != UR && tile != DL {
-					intersections++
-				}
-			} else if intersections%2 == 1 {
-				//fmt.Printf("%+v\n", coord)
-				inLoop += 1
-			}
-			delta++
-		}
-	}
-	fmt.Printf("%d\n", inLoop)
+	innerTileSubset := findInnerTiles(startingCoord, field, tileSet, moveTo)
+	innerTileSet := make(map[Coord]struct{})
+	bfs(field, lo.Keys(innerTileSubset), func(c Coord) bool {
+		_, exists := tileSet[c]
+		return !exists
+	}, func(c Coord) {
+		innerTileSet[c] = struct{}{}
+	})
+	fmt.Printf("%d\n", len(innerTileSet))
 }
