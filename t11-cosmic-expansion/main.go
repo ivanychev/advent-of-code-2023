@@ -12,7 +12,7 @@ type Tile rune
 const (
 	EMPTY_SPACE      Tile = '*'
 	GALAXY           Tile = '#'
-	EXPANSION_FACTOR      = 2
+	EXPANSION_FACTOR      = 1000000
 )
 
 type Coord struct {
