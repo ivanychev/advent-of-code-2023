@@ -4,7 +4,6 @@ import (
 	"advent_of_code/common"
 	"fmt"
 	"github.com/samber/lo"
-	"gonum.org/v1/gonum/stat/combin"
 	"log"
 	"strconv"
 	"strings"
@@ -17,77 +16,9 @@ const (
 )
 
 type Springs struct {
-	field             []rune
-	unknownIndices    []int
-	notWorksSequences []int
-}
-
-func (s Springs) BrokenSpringsCount() int {
-	return lo.Sum(s.notWorksSequences)
-}
-
-func (s Springs) ObservedBrokenSpringsCount() int {
-	return lo.Count(s.field, BROKEN)
-}
-
-func (s Springs) UnknownSpringsCount() int {
-	return len(s.unknownIndices)
-}
-
-func testField(field []rune, notWorksSequences []int) bool {
-	currentSequenceSize := 0
-	expectedSequenceSizeIdx := 0
-	for idx := 0; idx <= len(field); idx++ {
-		// Ending always with "."
-		cell := OPERATIONAL
-		if idx < len(field) {
-			cell = field[idx]
-		}
-
-		switch cell {
-		case OPERATIONAL:
-			if currentSequenceSize == 0 {
-				continue
-			}
-
-			if expectedSequenceSizeIdx >= len(notWorksSequences) || notWorksSequences[expectedSequenceSizeIdx] != currentSequenceSize {
-				return false
-			}
-			expectedSequenceSizeIdx += 1
-			currentSequenceSize = 0
-		case BROKEN:
-			currentSequenceSize += 1
-		default:
-			log.Fatalf("Invalid char: %v", cell)
-		}
-	}
-	return true
-}
-
-func (s Springs) CountCombinations() int {
-	n := s.UnknownSpringsCount()
-	k := s.BrokenSpringsCount() - s.ObservedBrokenSpringsCount()
-	indices := make([]int, k)
-	gen := combin.NewCombinationGenerator(n, k)
-
-	attemptField := make([]rune, len(s.field))
-	copy(attemptField, s.field)
-
-	counter := 0
-	for gen.Next() {
-		gen.Combination(indices)
-
-		for _, i := range s.unknownIndices {
-			attemptField[i] = OPERATIONAL
-		}
-		for _, i := range indices {
-			attemptField[s.unknownIndices[i]] = BROKEN
-		}
-		if testField(attemptField, s.notWorksSequences) {
-			counter++
-		}
-	}
-	return counter
+	Field           []rune
+	UnknownIndices  []int
+	BrokenSequences []int
 }
 
 func unfoldSlice[T any](s []T, times int) []T {
@@ -95,6 +26,16 @@ func unfoldSlice[T any](s []T, times int) []T {
 	for i := 0; i < times; i++ {
 		newSlice = append(newSlice, s...)
 	}
+	return newSlice
+}
+
+func unfoldTiles(tiles []rune, times int) []rune {
+	newSlice := make([]rune, 0, len(tiles)*times+(times-1))
+	for i := 0; i < times-1; i++ {
+		newSlice = append(newSlice, tiles...)
+		newSlice = append(newSlice, UNKNOWN)
+	}
+	newSlice = append(newSlice, tiles...)
 	return newSlice
 }
 
@@ -112,7 +53,7 @@ func SprintsFromString(raw string, unfolds int) Springs {
 	sequences = unfoldSlice(sequences, unfolds)
 	field := components[0]
 	fieldChars := []rune(field)
-	fieldChars = unfoldSlice(fieldChars, unfolds)
+	fieldChars = unfoldTiles(fieldChars, unfolds)
 	unknownIndicesTuples := lo.Filter(lo.Map(fieldChars, func(c rune, index int) lo.Tuple2[rune, int] {
 		return lo.T2(c, index)
 	}), func(item lo.Tuple2[rune, int], index int) bool {
@@ -122,13 +63,74 @@ func SprintsFromString(raw string, unfolds int) Springs {
 		return item.B
 	})
 	return Springs{
-		field:             fieldChars,
-		unknownIndices:    unknownIndices,
-		notWorksSequences: sequences,
+		Field:           fieldChars,
+		UnknownIndices:  unknownIndices,
+		BrokenSequences: sequences,
 	}
 }
 
+func ExistsBrokenRangeAt(tiles []rune, idx int, length int) bool {
+	if idx+length > len(tiles) {
+		return false
+	}
+	for i := 0; i < length; i++ {
+		if tiles[idx+i] == OPERATIONAL {
+			return false
+		}
+	}
+	return idx+length == len(tiles) || tiles[idx+length] != BROKEN
+}
+
+func CountCombinations(tiles []rune, brokenSeqs []int, tilesIdx int, brokenSeqsIdx int, cache *map[lo.Tuple2[int, int]]int) int {
+
+	solution, exists := (*cache)[lo.T2(tilesIdx, brokenSeqsIdx)]
+	if exists {
+		return solution
+	}
+
+	if tilesIdx >= len(tiles) {
+		// Ended scan.
+		if brokenSeqsIdx == len(brokenSeqs) {
+			(*cache)[lo.T2(tilesIdx, brokenSeqsIdx)] = 1
+			return 1
+		} else {
+			(*cache)[lo.T2(tilesIdx, brokenSeqsIdx)] = 0
+			return 0
+		}
+	}
+
+	switch tiles[tilesIdx] {
+	case OPERATIONAL:
+		count := CountCombinations(tiles, brokenSeqs, tilesIdx+1, brokenSeqsIdx, cache)
+		(*cache)[lo.T2(tilesIdx, brokenSeqsIdx)] = count
+		return count
+	case BROKEN:
+		count := computeBroken(tiles, brokenSeqs, tilesIdx, brokenSeqsIdx, cache)
+		(*cache)[lo.T2(tilesIdx, brokenSeqsIdx)] = count
+		return count
+	case UNKNOWN:
+		ifBrokenCount := computeBroken(tiles, brokenSeqs, tilesIdx, brokenSeqsIdx, cache)
+		ifOperationalCount := CountCombinations(tiles, brokenSeqs, tilesIdx+1, brokenSeqsIdx, cache)
+		(*cache)[lo.T2(tilesIdx, brokenSeqsIdx)] = ifOperationalCount + ifBrokenCount
+		return ifOperationalCount + ifBrokenCount
+	}
+	log.Fatalf("Unreacheable")
+	return 0
+}
+
+func computeBroken(tiles []rune, brokenSeqs []int, tilesIdx int, brokenSeqsIdx int, cache *map[lo.Tuple2[int, int]]int) int {
+	if brokenSeqsIdx >= len(brokenSeqs) {
+		return 0
+	}
+
+	if ExistsBrokenRangeAt(tiles, tilesIdx, brokenSeqs[brokenSeqsIdx]) {
+		return CountCombinations(tiles, brokenSeqs, tilesIdx+brokenSeqs[brokenSeqsIdx]+1, brokenSeqsIdx+1, cache)
+	}
+	return 0
+}
+
 func main() {
+	//rawSprings, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t12-hot-springs/test.txt")
 	rawSprings, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t12-hot-springs/1.txt")
 	if err != nil {
 		log.Fatalf("Failed to read file: %w", err)
@@ -138,6 +140,16 @@ func main() {
 		return SprintsFromString(s, 1)
 	}))
 	fmt.Printf("%d", lo.Sum(lo.Map(springs, func(s Springs, index int) int {
-		return s.CountCombinations()
+		cache := make(map[lo.Tuple2[int, int]]int)
+		return CountCombinations(s.Field, s.BrokenSequences, 0, 0, &cache)
 	})))
+	//cache := make(map[lo.Tuple2[int, int]]int)
+	//fmt.Printf("%d", CountCombinations(
+	//	[]rune{UNKNOWN, UNKNOWN, UNKNOWN, OPERATIONAL, BROKEN, BROKEN, BROKEN},
+	//	[]int{1, 1, 3},
+	//	0, 0, &cache))
+	//fmt.Printf("%d", CountCombinations(
+	//	[]rune{UNKNOWN, UNKNOWN, UNKNOWN, OPERATIONAL},
+	//	[]int{1, 1},
+	//	0, 0, &cache))
 }
