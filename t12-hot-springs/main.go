@@ -90,7 +90,15 @@ func (s Springs) CountCombinations() int {
 	return counter
 }
 
-func SprintsFromString(raw string) Springs {
+func unfoldSlice[T any](s []T, times int) []T {
+	newSlice := make([]T, 0, len(s)*times)
+	for i := 0; i < times; i++ {
+		newSlice = append(newSlice, s...)
+	}
+	return newSlice
+}
+
+func SprintsFromString(raw string, unfolds int) Springs {
 	// ????.######..#####. 1,6,5
 	components := strings.Fields(raw)
 	rawSequences := strings.Split(components[1], ",")
@@ -101,8 +109,10 @@ func SprintsFromString(raw string) Springs {
 		}
 		return num
 	})
+	sequences = unfoldSlice(sequences, unfolds)
 	field := components[0]
 	fieldChars := []rune(field)
+	fieldChars = unfoldSlice(fieldChars, unfolds)
 	unknownIndicesTuples := lo.Filter(lo.Map(fieldChars, func(c rune, index int) lo.Tuple2[rune, int] {
 		return lo.T2(c, index)
 	}), func(item lo.Tuple2[rune, int], index int) bool {
@@ -124,7 +134,9 @@ func main() {
 		log.Fatalf("Failed to read file: %w", err)
 	}
 
-	springs := lo.Map(rawSprings, common.NoIndex(SprintsFromString))
+	springs := lo.Map(rawSprings, common.NoIndex(func(s string) Springs {
+		return SprintsFromString(s, 1)
+	}))
 	fmt.Printf("%d", lo.Sum(lo.Map(springs, func(s Springs, index int) int {
 		return s.CountCombinations()
 	})))
