@@ -137,7 +137,7 @@ func main() {
 	}
 
 	springs := lo.Map(rawSprings, common.NoIndex(func(s string) Springs {
-		return SprintsFromString(s, 1)
+		return SprintsFromString(s, 5)
 	}))
 	fmt.Printf("%d", lo.Sum(lo.Map(springs, func(s Springs, index int) int {
 		cache := make(map[lo.Tuple2[int, int]]int)
