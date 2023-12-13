@@ -104,7 +104,7 @@ func main() {
 	}
 	rawMaps := strings.Split(string(allMaps), "\n\n")
 	intersections := lo.FlatMap(rawMaps, func(m string, index int) []Intersection {
-		return findIntersections(m, 0)
+		return findIntersections(m, 1)
 	})
 	fmt.Printf("%d\n", lo.SumBy(intersections, func(i Intersection) int {
 		return i.ToValue()
