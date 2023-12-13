@@ -29,55 +29,63 @@ func (i Intersection) ToValue() int {
 	return i.secondPartStartCoord * 100
 }
 
-func CheckXMirror(m [][]rune, atX int) bool {
+func CheckXMirror(m [][]rune, atX int, requiredErrors int) bool {
 	leftColumn := atX
 	rightColumn := atX + 1
+	encounteredErrors := 0
 	if rightColumn >= len(m[0]) {
 		return false
 	}
 	for leftColumn >= 0 && rightColumn < len(m[0]) {
 		for y := 0; y < len(m); y++ {
 			if m[y][leftColumn] != m[y][rightColumn] {
+				encounteredErrors += 1
+			}
+			if encounteredErrors > requiredErrors {
 				return false
 			}
 		}
 		leftColumn--
 		rightColumn++
 	}
-	return true
+	return requiredErrors == encounteredErrors
 }
 
-func CheckYMirror(m [][]rune, atY int) bool {
+func CheckYMirror(m [][]rune, atY int, requiredErrors int) bool {
 	upperRow := atY
 	lowerRow := atY + 1
+	encounteredErrors := 0
 	if lowerRow >= len(m) {
 		return false
 	}
 	for upperRow >= 0 && lowerRow < len(m) {
 		for x := 0; x < len(m[0]); x++ {
 			if m[upperRow][x] != m[lowerRow][x] {
+				encounteredErrors += 1
+			}
+			if encounteredErrors > requiredErrors {
 				return false
 			}
 		}
 		upperRow--
 		lowerRow++
 	}
-	return true
+	return requiredErrors == encounteredErrors
 }
 
-func findIntersections(rawMap string) []Intersection {
+func findIntersections(rawMap string, requiredErrors int) []Intersection {
 	rowsAsStrings := strings.Split(rawMap, "\n")
 	rows := lo.Map(rowsAsStrings, common.NoIndex(func(s string) []rune {
 		return []rune(s)
 	}))
 	intersections := make([]Intersection, 0)
 	for x := 0; x < len(rows[0])-1; x++ {
-		if CheckXMirror(rows, x) {
+		if CheckXMirror(rows, x, requiredErrors) {
 			intersections = append(intersections, Intersection{VERTICAL, x + 1})
 		}
 	}
 	for y := 0; y < len(rows)-1; y++ {
-		if CheckYMirror(rows, y) {
+		if CheckYMirror(rows, y, requiredErrors) {
 			intersections = append(intersections, Intersection{HORIZONTAL, y + 1})
 		}
 	}
@@ -95,7 +103,9 @@ func main() {
 		log.Fatalf("Failed to read file")
 	}
 	rawMaps := strings.Split(string(allMaps), "\n\n")
-	intersections := lo.FlatMap(rawMaps, common.NoIndex(findIntersections))
+	intersections := lo.FlatMap(rawMaps, func(m string, index int) []Intersection {
+		return findIntersections(m, 0)
+	})
 	fmt.Printf("%d\n", lo.SumBy(intersections, func(i Intersection) int {
 		return i.ToValue()
 	}))
