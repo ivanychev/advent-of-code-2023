@@ -10,6 +10,7 @@ import (
 )
 
 const MAX_STRAIGHT_STEPS = 3
+const MIN_STRAIGHT_STEPS = 1
 
 type MoveState struct {
 	x, y          int
@@ -139,17 +140,19 @@ func (s MoveStateList) NextSteps(ctx TaskContext) []MoveStateList {
 			prev: &s,
 		})
 	}
-	turnDirections := s.direction.Turns()
-	for _, direction := range turnDirections {
-		newStates = append(newStates, MoveStateList{
-			MoveState: MoveState{
-				direction:     direction,
-				sinceLastTurn: 1,
-				x:             s.x + direction.DeltaX,
-				y:             s.y + direction.DeltaY,
-			},
-			prev: &s,
-		})
+	if s.sinceLastTurn >= MIN_STRAIGHT_STEPS {
+		turnDirections := s.direction.Turns()
+		for _, direction := range turnDirections {
+			newStates = append(newStates, MoveStateList{
+				MoveState: MoveState{
+					direction:     direction,
+					sinceLastTurn: 1,
+					x:             s.x + direction.DeltaX,
+					y:             s.y + direction.DeltaY,
+				},
+				prev: &s,
+			})
+		}
 	}
 	statesWithinField := lo.Filter(newStates, func(item MoveStateList, index int) bool {
 		return item.IsCorrect(ctx)
