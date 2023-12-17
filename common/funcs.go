@@ -9,6 +9,64 @@ import (
 	"strings"
 )
 
+type DirectionName string
+
+const (
+	UP    DirectionName = "UP"
+	DOWN  DirectionName = "DOWN"
+	LEFT  DirectionName = "LEFT"
+	RIGHT DirectionName = "RIGHT"
+)
+
+type DirectionDesc struct {
+	Name           DirectionName
+	Char           rune
+	DeltaX, DeltaY int
+	*Directions
+}
+
+func (d DirectionDesc) Turns() [2]DirectionDesc {
+	return d.Directions.Turns(d)
+}
+
+type Directions struct {
+	Up, Down, Left, Right DirectionDesc
+}
+
+func NewDirections() Directions {
+	dirs := Directions{
+		Up: DirectionDesc{
+			UP, '^', 0, -1, nil,
+		},
+		Down: DirectionDesc{
+			DOWN, 'v', 0, 1, nil,
+		},
+		Left: DirectionDesc{
+			LEFT, '<', -1, 0, nil,
+		},
+		Right: DirectionDesc{
+			RIGHT, '>', 1, 0, nil,
+		},
+	}
+	dirs.Left.Directions = &dirs
+	dirs.Right.Directions = &dirs
+	dirs.Down.Directions = &dirs
+	dirs.Up.Directions = &dirs
+
+	return dirs
+}
+
+func (d Directions) Turns(desc DirectionDesc) [2]DirectionDesc {
+	switch desc.Char {
+	case '^', 'v':
+		return [2]DirectionDesc{d.Left, d.Right}
+	case '>', '<':
+		return [2]DirectionDesc{d.Up, d.Down}
+	}
+	log.Fatalf("Unreacheable")
+	return [2]DirectionDesc{d.Up, d.Down}
+}
+
 type Number interface {
 	int
 }
