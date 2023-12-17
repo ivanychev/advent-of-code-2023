@@ -9,6 +9,7 @@ require (
 
 require (
 	github.com/emirpasic/gods v1.18.1 // indirect
+	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/segmentio/fasthash v1.0.3 // indirect
 	github.com/zyedidia/generic v1.2.1 // indirect
 	golang.org/x/exp v0.0.0-20230321023759-10a507213a29 // indirect
