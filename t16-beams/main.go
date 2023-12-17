@@ -9,6 +9,7 @@ import (
 	"log"
 	"slices"
 	"strings"
+	"sync"
 )
 
 type Direction struct {
@@ -219,6 +220,43 @@ func Draw(f BeamField, beams []BeamCoord) string {
 	return sb.String()
 }
 
+func startCoordConfigurations(f BeamField) [][]BeamCoord {
+	configs := make([][]BeamCoord, 0)
+	for x := 0; x < len(f.tiles[0]); x++ {
+		configs = append(configs, []BeamCoord{{DOWN, x, 0}})
+		configs = append(configs, []BeamCoord{{UP, x, len(f.tiles) - 1}})
+	}
+	for y := 0; y < len(f.tiles); y++ {
+		configs = append(configs, []BeamCoord{{RIGHT, 0, y}})
+		configs = append(configs, []BeamCoord{{LEFT, len(f.tiles[0]) - 1, y}})
+	}
+	return configs
+}
+
+func findMaxEnergized(field BeamField, coords []BeamCoord, output chan<- int, wg *sync.WaitGroup) {
+	encounteredHashes := make(map[uint64][]BeamCoord)
+	encounteredCoords := make(map[Coord]int)
+	hash := HashCoords(coords)
+	exists := false
+
+	for !exists {
+		for _, c := range coords {
+			encounteredCoords[Coord{c.x, c.y}]++
+		}
+		encounteredHashes[hash] = coords
+		coords = lo.FlatMap(coords, func(c BeamCoord, index int) []BeamCoord {
+			return c.Step(field)
+		})
+		coords = lo.Uniq(coords)
+		slices.SortFunc(coords, CompareBeamCoord)
+
+		hash = HashCoords(coords)
+		_, exists = encounteredHashes[hash]
+	}
+	output <- len(encounteredCoords)
+	wg.Done()
+}
+
 func main() {
 	//rows, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t16-beams/test.txt")
 	rows, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t16-beams/1.txt")
@@ -228,45 +266,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to open file: %w", err)
 	}
-	encounteredHashes := make(map[uint64][]BeamCoord)
-	encounteredCoords := make(map[Coord]int)
-	coords := []BeamCoord{
-		{RIGHT, 0, 0},
-	}
-	hash := HashCoords(coords)
-	if err != nil {
-		log.Fatalf("Failed %w", err)
-	}
-	exists := false
-	total := 0
 
-	//fmt.Printf("%s\n\n", Draw(field, coords))
-	//fmt.Printf("")
-	for !exists {
-		for _, c := range coords {
-			encounteredCoords[Coord{c.x, c.y}]++
-		}
-		encounteredHashes[hash] = coords
-		if total == 3 {
-			fmt.Printf("Here")
-		}
-		coords = lo.FlatMap(coords, func(c BeamCoord, index int) []BeamCoord {
-			return c.Step(field)
-		})
-		coords = lo.Uniq(coords)
-		slices.SortFunc(coords, CompareBeamCoord)
-		//fmt.Printf("%s\n\n", Draw(field, coords))
-		//fmt.Printf("")
+	maxEnergized := 0
+	var wg sync.WaitGroup
+	coordConfigurations := startCoordConfigurations(field)
+	wg.Add(len(coordConfigurations))
 
-		hash = HashCoords(coords)
-		if err != nil {
-			log.Fatalf("Failed %w", err)
-		}
-		_, exists = encounteredHashes[hash]
-		if exists {
-			fmt.Printf("Here")
-		}
-		total += 1
+	fmt.Printf("Processing %d configurations\n", len(coordConfigurations))
+	results := make(chan int, len(coordConfigurations))
+	for _, coords := range coordConfigurations {
+		go findMaxEnergized(field, coords, results, &wg)
 	}
-	fmt.Printf("Energized: %d\n", len(encounteredCoords))
+	wg.Wait()
+	close(results)
+	for x := range results {
+		maxEnergized = max(maxEnergized, x)
+	}
+
+	fmt.Printf("Max: %d\n", maxEnergized)
 }
