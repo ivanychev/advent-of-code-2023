@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-const MAX_STRAIGHT_STEPS = 3
-const MIN_STRAIGHT_STEPS = 1
+const MAX_STRAIGHT_STEPS = 10
+const MIN_STRAIGHT_STEPS = 4
 
 type MoveState struct {
 	x, y          int
@@ -50,10 +50,6 @@ type TaskContext struct {
 	Field
 }
 
-//func (c TaskContext) AtCoord(x, y int) []MoveState {
-//
-//}
-
 func (c TaskContext) PrintMinLosses() string {
 	losses := make([][]int, len(c.Field.tiles))
 	for idx, _ := range losses {
@@ -83,47 +79,7 @@ func (c TaskContext) PrintMinLosses() string {
 
 func (s MoveStateList) NextSteps(ctx TaskContext) []MoveStateList {
 	newStates := make([]MoveStateList, 0)
-
-	//if s.HasCoords([]lo.Tuple2[int, int]{
-	//	lo.T2(0, 0), // 2
-	//	lo.T2(1, 0), // 6
-	//	lo.T2(2, 0), // 7
-	//	lo.T2(2, 1), // 8
-	//	lo.T2(3, 1), // 13
-	//	lo.T2(4, 1), // 17
-	//	lo.T2(5, 1), // 22
-	//	lo.T2(5, 0), // 25
-	//	//lo.T2(6, 0), // 27
-	//	//lo.T2(7, 0), // 30
-	//	//lo.T2(8, 0), // 31
-	//	//lo.T2(8, 1), // 34
-	//	//lo.T2(8, 2), // 39
-	//	//lo.T2(9, 2), // 43
-	//	//lo.T2(10, 2), // 45  # exists
-	//	//lo.T2(10, 3), // 49
-	//	//lo.T2(10, 4), // 54
-	//	//lo.T2(11, 4), // 57
-	//	//lo.T2(11, 5), // 62
-	//	//lo.T2(11, 6), // 68
-	//	//lo.T2(11, 7), // 73
-	//	//lo.T2(12, 7), // 76
-	//	//lo.T2(12, 8), // 83
-	//	//lo.T2(12, 9), // 86
-	//	//lo.T2(12, 10), // 89
-	//	//lo.T2(11, 10), // 95
-	//	//lo.T2(11, 11), // 98
-	//	//lo.T2(11, 12), // 101
-	//	//lo.T2(12, 12), // 104
-	//}) {
-	//	fmt.Printf("Here")
-	//}
-
 	currentLoss, exists := (*ctx.minLossByState)[s.MoveState]
-
-	//expected := MoveState{10, 2, ctx.directions.Right, 2}
-	//if s.MoveState == expected && currentLoss.loss == 45 {
-	//	fmt.Printf("Here\n")
-	//}
 
 	if !exists {
 		log.Fatalf("Not state not exists")
@@ -171,9 +127,6 @@ func (s MoveStateList) NextSteps(ctx TaskContext) []MoveStateList {
 			loss: item.B,
 			lst:  &item.A,
 		}
-		//if item.A.x == 3 && item.A.y == 0 {
-		//	fmt.Printf("Here\n")
-		//}
 		if item.A.x == len(ctx.Field.tiles[0])-1 && item.A.y == len(ctx.Field.tiles)-1 && (item.B < *ctx.minEncounteredLoss || *ctx.minEncounteredLoss < 0) {
 			*ctx.minEncounteredLoss = item.B
 		}
@@ -207,7 +160,6 @@ func NewField(rawField []string) Field {
 
 func main() {
 	values, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t17-clumsy/1.txt")
-	//values, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t17-clumsy/test.txt")
 	if err != nil {
 		log.Fatalf("%w", err)
 	}
@@ -218,8 +170,6 @@ func main() {
 		{MoveState: MoveState{x: 0, y: 0, direction: directions.Down, sinceLastTurn: 0}, prev: nil},
 	}
 	minLossByState := map[MoveState]MoveStateListAndLoss{
-		//states[0].MoveState: {&states[0], field.tiles[0][0]},
-		//states[1].MoveState: {&states[1], field.tiles[0][0]},
 		states[0].MoveState: {&states[0], 0},
 		states[1].MoveState: {&states[1], 0},
 	}
@@ -237,6 +187,5 @@ func main() {
 			return item.NextSteps(ctx)
 		})
 	}
-	//fmt.Printf("%s\b", ctx.PrintMinLosses())
 	fmt.Printf("Min loss: %d\n", *ctx.minEncounteredLoss)
 }
