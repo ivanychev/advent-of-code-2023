@@ -4,7 +4,6 @@ import (
 	"advent_of_code/common"
 	"fmt"
 	"github.com/samber/lo"
-	"image/color"
 	"log"
 	"strconv"
 	"strings"
@@ -46,7 +45,6 @@ func (c TaskContext) DirectionFromChar(dir string) common.DirectionDesc {
 type DigStep struct {
 	direction common.DirectionDesc
 	size      int
-	color     color.RGBA
 }
 
 func ParseDigStep(ctx TaskContext, s string) DigStep {
@@ -57,16 +55,38 @@ func ParseDigStep(ctx TaskContext, s string) DigStep {
 	if err != nil {
 		log.Fatalf("Failed to parse int")
 	}
+	return DigStep{
+		direction: direction,
+		size:      size,
+	}
+}
+
+func ParseDigStep2(ctx TaskContext, s string) DigStep {
+	// L 5 (#7e2d02)
+	components := strings.Fields(s)
 	rawRgb := strings.Trim(components[2], "()")
-	var color color.RGBA
-	_, err = fmt.Sscanf(rawRgb, "#%02x%02x%02x", &color.R, &color.G, &color.B)
+	var size, rawDirection int
+	_, err := fmt.Sscanf(rawRgb, "#%05x%01x", &size, &rawDirection)
+	var direction common.DirectionDesc
+	// 0 means R, 1 means D, 2 means L, and 3 means U.
+	switch rawDirection {
+	case 0:
+		direction = ctx.directions.Right
+	case 1:
+		direction = ctx.directions.Down
+	case 2:
+		direction = ctx.directions.Left
+	case 3:
+		direction = ctx.directions.Up
+	default:
+		log.Fatalf("Unreacheable")
+	}
 	if err != nil {
 		log.Fatalf("Failed to parse color")
 	}
 	return DigStep{
 		direction: direction,
 		size:      size,
-		color:     color,
 	}
 }
 
@@ -175,7 +195,7 @@ func (f Field) ToString() string {
 }
 
 func main() {
-	rows, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t18-lavaduct-lagoon/1.txt")
+	rows, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t18-lavaduct-lagoon/test.txt")
 	if err != nil {
 		log.Fatalf("Failed to read file")
 	}
@@ -183,12 +203,12 @@ func main() {
 		directions: common.NewDirections(),
 	}
 	digSteps := lo.Map(rows, common.NoIndex(func(row string) DigStep {
-		return ParseDigStep(ctx, row)
+		return ParseDigStep2(ctx, row)
 	}))
 	field := NewField(digSteps)
 	field.DigSteps(digSteps)
-	fmt.Printf("%s\n\n", field.ToString())
+	//fmt.Printf("%s\n\n", field.ToString())
 	field.FillInner()
-	fmt.Printf("%s\n\n", field.ToString())
+	//fmt.Printf("%s\n\n", field.ToString())
 	fmt.Printf("Dug: %d\n", field.CountDug())
 }
