@@ -3,6 +3,7 @@ package common
 import (
 	"bufio"
 	"fmt"
+	"github.com/samber/lo"
 	"log"
 	"os"
 	"strconv"
@@ -125,4 +126,23 @@ func StringOfNumbersToInts(s string) []int {
 		returned = append(returned, val)
 	}
 	return returned
+}
+
+func CreateRuneMatrix(sizeX, sizeY int, fillWith rune) [][]rune {
+	m := make([][]rune, 0, sizeY)
+	for i := 0; i < sizeY; i++ {
+		m = append(m, lo.Times(sizeX, func(index int) rune {
+			return fillWith
+		}))
+	}
+	return m
+}
+
+func RuneMatrixToString(m [][]rune) string {
+	var sb strings.Builder
+	for _, bts := range m {
+		sb.WriteString(string(bts))
+		sb.WriteRune('\n')
+	}
+	return sb.String()
 }
