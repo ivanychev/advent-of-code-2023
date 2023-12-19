@@ -146,3 +146,11 @@ func RuneMatrixToString(m [][]rune) string {
 	}
 	return sb.String()
 }
+
+func MustAtoi(s string) int {
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		log.Fatalf("Failed to parse %s", s)
+	}
+	return n
+}
