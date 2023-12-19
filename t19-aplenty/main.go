@@ -12,9 +12,11 @@ import (
 )
 
 const (
-	Accept = "A"
-	Reject = "R"
-	Input  = "in"
+	Accept             = "A"
+	Reject             = "R"
+	Input              = "in"
+	MIN_RANGE          = 1
+	MAX_RANGE_EXCLUDED = 4000 + 1
 )
 
 var TriggerRegex = regexp2.MustCompile("^(?<prop>\\w{1})(?<op>[<>]{1})(?<threshold>\\d+):(?<outcome>\\w+)$", regexp2.IgnoreCase)
@@ -25,8 +27,13 @@ func AlwaysTrueCond(d Detail) bool {
 	return true
 }
 
+func AlwaysTrueCondRange(d DetailRange) (DetailRange, DetailRange) {
+	return d, DetailRange{}
+}
+
 type WorkflowTrigger struct {
 	Cond           func(Detail) bool
+	CondRange      func(detailRange DetailRange) (DetailRange, DetailRange)
 	OutputWorkflow string
 }
 
@@ -45,8 +52,109 @@ func (w Workflow) Process(d Detail) string {
 	return ""
 }
 
+func (w Workflow) ProcessRange(d DetailRange) []lo.Tuple2[DetailRange, string] {
+	returned := make([]lo.Tuple2[DetailRange, string], 0)
+	for _, trigger := range w.triggers {
+		trueRange, falseRange := trigger.CondRange(d)
+		if !trueRange.IsEmpty() {
+			returned = append(returned, lo.T2(trueRange, trigger.OutputWorkflow))
+		}
+		d = falseRange
+	}
+	return returned
+}
+
 type Detail struct {
 	x, m, a, s int
+}
+
+func (d Detail) ToRange() DetailRange {
+	return DetailRange{
+		xMin: d.x,
+		xMax: d.x + 1,
+		mMin: d.m,
+		mMax: d.m + 1,
+		aMin: d.a,
+		aMax: d.a + 1,
+		sMin: d.s,
+		sMax: d.s + 1,
+	}
+}
+
+type DetailRange struct {
+	xMin, xMax, mMin, mMax, aMin, aMax, sMin, sMax int
+}
+
+func (r DetailRange) ToString() string {
+	return fmt.Sprintf("x[%d,%d) m[%d,%d) a[%d,%d) s[%d,%d)", r.xMin, r.xMax, r.mMin, r.mMax, r.aMin, r.aMax, r.sMin, r.sMax)
+}
+
+func (r DetailRange) SplitAtX(x int) (DetailRange, DetailRange) {
+	if x < r.xMin {
+		return DetailRange{}, r
+	} else if x > r.xMax {
+		return r, DetailRange{}
+	} else {
+		left := r
+		right := r
+		left.xMax = x
+		right.xMin = x
+		return left, right
+	}
+}
+
+func (r DetailRange) SplitAtM(m int) (DetailRange, DetailRange) {
+	if m < r.mMin {
+		return DetailRange{}, r
+	} else if m > r.mMax {
+		return r, DetailRange{}
+	} else {
+		left := r
+		right := r
+		left.mMax = m
+		right.mMin = m
+		return left, right
+	}
+}
+
+func (r DetailRange) SplitAtA(a int) (DetailRange, DetailRange) {
+	if a < r.aMin {
+		return DetailRange{}, r
+	} else if a > r.aMax {
+		return r, DetailRange{}
+	} else {
+		left := r
+		right := r
+		left.aMax = a
+		right.aMin = a
+		return left, right
+	}
+}
+
+func (r DetailRange) SplitAtS(s int) (DetailRange, DetailRange) {
+	if s < r.sMin {
+		return DetailRange{}, r
+	} else if s > r.sMax {
+		return r, DetailRange{}
+	} else {
+		left := r
+		right := r
+		left.sMax = s
+		right.sMin = s
+		return left, right
+	}
+}
+
+func (r DetailRange) Size() int {
+	return (r.xMax - r.xMin) * (r.mMax - r.mMin) * (r.aMax - r.aMin) * (r.sMax - r.sMin)
+}
+
+func (r DetailRange) DetailTotal() int {
+	return r.xMin + r.mMin + r.aMin + r.sMin
+}
+
+func (r DetailRange) IsEmpty() bool {
+	return r.Size() == 0
 }
 
 func (d Detail) Total() int {
@@ -65,6 +173,7 @@ func ParseTrigger(rawTrigger string) WorkflowTrigger {
 		}
 		return WorkflowTrigger{
 			Cond:           AlwaysTrueCond,
+			CondRange:      AlwaysTrueCondRange,
 			OutputWorkflow: rawTrigger,
 		}
 	}
@@ -78,24 +187,38 @@ func ParseTrigger(rawTrigger string) WorkflowTrigger {
 	}
 
 	var testedProertyAccessor func(Detail) int
+	var splitter func(detailRange DetailRange, at int) (DetailRange, DetailRange)
 	var predicate func(Detail) bool
+	var rangePredicate func(detailRange DetailRange) (DetailRange, DetailRange)
 
 	switch testedProerty {
 	case "x":
 		testedProertyAccessor = func(d Detail) int {
 			return d.x
 		}
+		splitter = func(detailRange DetailRange, at int) (DetailRange, DetailRange) {
+			return detailRange.SplitAtX(at)
+		}
 	case "m":
 		testedProertyAccessor = func(d Detail) int {
 			return d.m
+		}
+		splitter = func(detailRange DetailRange, at int) (DetailRange, DetailRange) {
+			return detailRange.SplitAtM(at)
 		}
 	case "a":
 		testedProertyAccessor = func(d Detail) int {
 			return d.a
 		}
+		splitter = func(detailRange DetailRange, at int) (DetailRange, DetailRange) {
+			return detailRange.SplitAtA(at)
+		}
 	case "s":
 		testedProertyAccessor = func(d Detail) int {
 			return d.s
+		}
+		splitter = func(detailRange DetailRange, at int) (DetailRange, DetailRange) {
+			return detailRange.SplitAtS(at)
 		}
 	default:
 		log.Fatalf("Unknown op: %s", testedProerty)
@@ -106,9 +229,17 @@ func ParseTrigger(rawTrigger string) WorkflowTrigger {
 		predicate = func(detail Detail) bool {
 			return testedProertyAccessor(detail) < threshold
 		}
+		rangePredicate = func(detailRange DetailRange) (DetailRange, DetailRange) {
+			beforeThreshold, hereAndAfter := splitter(detailRange, threshold)
+			return beforeThreshold, hereAndAfter
+		}
 	case ">":
 		predicate = func(detail Detail) bool {
 			return testedProertyAccessor(detail) > threshold
+		}
+		rangePredicate = func(detailRange DetailRange) (DetailRange, DetailRange) {
+			lowerOrEqual, greaterThan := splitter(detailRange, threshold+1)
+			return greaterThan, lowerOrEqual
 		}
 	default:
 		log.Fatalf("Unknown op: %s", operation)
@@ -118,6 +249,7 @@ func ParseTrigger(rawTrigger string) WorkflowTrigger {
 	return WorkflowTrigger{
 		OutputWorkflow: outcomeWorkflow,
 		Cond:           predicate,
+		CondRange:      rangePredicate,
 	}
 }
 
@@ -188,14 +320,81 @@ func ProcessDetails(details []Detail, workflows []Workflow) []Detail {
 	return acceptedDetails
 }
 
+func DebugPrintActiveDetails(m []lo.Tuple2[DetailRange, string]) {
+	nameToRanges := lo.GroupBy(m, func(item lo.Tuple2[DetailRange, string]) string {
+		return item.B
+	})
+	for name, ranges := range nameToRanges {
+		fmt.Printf("%s\n", name)
+		for _, r := range ranges {
+			fmt.Printf("  %s\n", r.A.ToString())
+		}
+	}
+	fmt.Printf("---\n")
+}
+
+func ProcessDetailRange(detailRanges []DetailRange, workflows []Workflow) []DetailRange {
+	nameToWorkflow := lo.MapValues(lo.GroupBy(workflows, func(w Workflow) string {
+		return w.name
+	}), func(w []Workflow, key string) Workflow {
+		return w[0]
+	})
+	activeDetails := lo.Map(detailRanges, func(d DetailRange, i int) lo.Tuple2[DetailRange, string] {
+		return lo.T2(d, Input)
+	})
+	acceptedDetails := make([]DetailRange, 0)
+	for len(activeDetails) > 0 {
+		newActiveDetails := make([]lo.Tuple2[DetailRange, string], 0)
+		for _, detail := range activeDetails {
+			newRangesAndWorkflows := nameToWorkflow[detail.B].ProcessRange(detail.A)
+			for _, pair := range newRangesAndWorkflows {
+				rng := pair.A
+				workflow := pair.B
+				switch workflow {
+				case Reject:
+				case Accept:
+					acceptedDetails = append(acceptedDetails, rng)
+				default:
+					newActiveDetails = append(newActiveDetails, lo.T2(rng, workflow))
+				}
+			}
+		}
+		activeDetails = newActiveDetails
+	}
+	return acceptedDetails
+
+}
+
 func main() {
 	file, err := os.ReadFile("/Users/iv/Code/advent-of-code-2023/t19-aplenty/1.txt")
 	if err != nil {
 		log.Fatalf("Failed to read file: %w", err)
 	}
-	workflows, details := ParseWorkflowsAndDetails(string(file))
-	acceptedDetails := ProcessDetails(details, workflows)
-	fmt.Printf("Sum: %d\n", lo.SumBy(acceptedDetails, func(d Detail) int {
-		return d.Total()
+	workflows, _ := ParseWorkflowsAndDetails(string(file))
+
+	//detailRanges := lo.Map(details, func(item Detail, index int) DetailRange {
+	//	return item.ToRange()
+	//})
+
+	detailRanges := []DetailRange{{
+		xMin: MIN_RANGE,
+		xMax: MAX_RANGE_EXCLUDED,
+		mMin: MIN_RANGE,
+		mMax: MAX_RANGE_EXCLUDED,
+		aMin: MIN_RANGE,
+		aMax: MAX_RANGE_EXCLUDED,
+		sMin: MIN_RANGE,
+		sMax: MAX_RANGE_EXCLUDED,
+	}}
+
+	acceptedDetails := ProcessDetailRange(detailRanges, workflows)
+	fmt.Printf("Sum: %d\n", lo.SumBy(acceptedDetails, func(d DetailRange) int {
+		return d.Size()
 	}))
+	//fmt.Printf("Sum: %d\n", lo.SumBy(acceptedDetails, func(d DetailRange) int {
+	//	return d.DetailTotal()
+	//}))
 }
+
+// 167409079868000
+// 172703741240000
