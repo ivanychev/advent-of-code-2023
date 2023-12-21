@@ -160,28 +160,32 @@ func ParseConnections(rows []string) map[string]Module {
 	return moduleMap
 }
 
-func Push(nameToModule *map[string]Module) (int64, int64) {
+func Push(nameToModule *map[string]Module, elapsed int) bool {
 	q := queue.New[Pulse]()
 	var lows, highs int64
 	q.Enqueue(Pulse{strength: Low, source: Button, destination: BroadcasterToken})
 	for !q.Empty() {
 		pulse := q.Dequeue()
 
-		if pulse.strength == Low {
+		if pulse.destination == "rx" && pulse.strength == Low {
+			return true
 			lows += 1
-		} else {
+		}
+		if pulse.destination == "rx" && pulse.strength == High {
 			highs += 1
 		}
-
-		destination, exists := (*nameToModule)[pulse.destination]
-		if !exists {
-			log.Fatalf("%s doesn't exist", pulse.destination)
+		if pulse.destination == "hf" && pulse.strength == High {
+			m := (*nameToModule)["hf"]
+			fmt.Printf("Here! &+v\n", m)
 		}
+
+		destination := (*nameToModule)[pulse.destination]
+
 		for _, newPulse := range destination.ApplyPulse(pulse) {
 			q.Enqueue(newPulse)
 		}
 	}
-	return lows, highs
+	return lows == 1 && highs == 0
 }
 
 func main() {
@@ -191,12 +195,13 @@ func main() {
 	}
 
 	nameToModule := ParseConnections(contents)
-	var totalLows, totalHighs int64
-	for i := 0; i < PulseCount; i++ {
-		lows, highs := Push(&nameToModule)
-		totalLows += lows
-		totalHighs += highs
+	var total int
+	for {
+		total += 1
+		if Push(&nameToModule, total) {
+			break
+		}
 	}
-	fmt.Printf("Total: %d\n", totalLows*totalHighs)
+	fmt.Printf("Total: %d\n", total)
 
 }
