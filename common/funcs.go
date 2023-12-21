@@ -19,6 +19,10 @@ const (
 	RIGHT DirectionName = "RIGHT"
 )
 
+type Coord struct {
+	X, Y int
+}
+
 type DirectionDesc struct {
 	Name           DirectionName
 	Char           rune
@@ -153,4 +157,30 @@ func MustAtoi(s string) int {
 		log.Fatalf("Failed to parse %s", s)
 	}
 	return n
+}
+
+func IsValidCoord[A any](c Coord, tiles [][]A) bool {
+	return 0 <= c.X && c.X < len(tiles[0]) && 0 <= c.Y && c.Y < len(tiles)
+}
+
+func AdjacentCoords[A any](c Coord, tiles [][]A) []Coord {
+	coords := make([]Coord, 0, 4)
+
+	cand := Coord{c.X + 1, c.Y}
+	if IsValidCoord(cand, tiles) {
+		coords = append(coords, cand)
+	}
+	cand = Coord{c.X - 1, c.Y}
+	if IsValidCoord(cand, tiles) {
+		coords = append(coords, cand)
+	}
+	cand = Coord{c.X, c.Y + 1}
+	if IsValidCoord(cand, tiles) {
+		coords = append(coords, cand)
+	}
+	cand = Coord{c.X, c.Y - 1}
+	if IsValidCoord(cand, tiles) {
+		coords = append(coords, cand)
+	}
+	return coords
 }
