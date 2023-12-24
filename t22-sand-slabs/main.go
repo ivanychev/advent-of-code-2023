@@ -4,6 +4,7 @@ import (
 	"advent_of_code/common"
 	"fmt"
 	"github.com/samber/lo"
+	"github.com/zyedidia/generic/queue"
 	"log"
 	"strings"
 )
@@ -129,6 +130,87 @@ func BuildField(rects []Rect) Field {
 	return f
 }
 
+func EnsureInitSet(k *Rect, m *map[*Rect]map[*Rect]struct{}) {
+	if _, exists := (*m)[k]; !exists {
+		(*m)[k] = make(map[*Rect]struct{})
+	}
+}
+
+func AddSliceToSet(key *Rect, values []*Rect, m *map[*Rect]map[*Rect]struct{}) {
+	for _, v := range values {
+		(*m)[key][v] = struct{}{}
+	}
+}
+
+func (f *Field) FallAll() {
+	for len(f.canFall) > 0 {
+		falling := f.canFall[len(f.canFall)-1]
+		f.canFall = f.canFall[:len(f.canFall)-1]
+		candidates := f.AboveRect(falling)
+		f.Fall(falling)
+		for _, c := range candidates {
+			if f.CanFall(c) {
+				f.canFall = append(f.canFall, c)
+			}
+		}
+	}
+}
+
+func (f *Field) BuildSupportIndexes() (map[*Rect]map[*Rect]struct{}, map[*Rect]map[*Rect]struct{}, map[*Rect]struct{}) {
+	supportsMap := make(map[*Rect]map[*Rect]struct{})
+	supportedByMap := make(map[*Rect]map[*Rect]struct{})
+	supportedBySingle := make(map[*Rect]struct{})
+
+	for _, rect := range f.RectPts() {
+		unders := f.UnderRect(rect)
+		EnsureInitSet(rect, &supportedByMap)
+		AddSliceToSet(rect, unders, &supportedByMap)
+
+		for _, support := range unders {
+			EnsureInitSet(support, &supportsMap)
+			supportsMap[support][rect] = struct{}{}
+		}
+	}
+
+	for k, v := range supportedByMap {
+		if len(v) == 1 {
+			supportedBySingle[k] = struct{}{}
+		}
+	}
+
+	return supportsMap, supportedByMap, supportedBySingle
+}
+
+func AnyKey[K comparable, V any](m map[K]V) K {
+	for k, _ := range m {
+		return k
+	}
+	log.Fatalf("Unreacheable")
+	var k K
+	return k
+}
+
+func (f Field) ComputeFallenBricks(rect *Rect) int {
+	supportsMap, supportedByMap, _ := f.BuildSupportIndexes()
+	q := queue.New[*Rect]()
+	q.Enqueue(rect)
+	total := -1
+
+	for !q.Empty() {
+		curr := q.Dequeue()
+		total += 1
+		currSupports := supportsMap[curr]
+		for supports, _ := range currSupports {
+			delete(supportedByMap[supports], curr)
+			if len(supportedByMap[supports]) == 0 {
+				q.Enqueue(supports)
+			}
+		}
+		delete(supportsMap, curr)
+	}
+	return total
+}
+
 func main() {
 	rows, err := common.FileToRows("/Users/iv/Code/advent-of-code-2023/t22-sand-slabs/1.txt")
 	if err != nil {
@@ -136,27 +218,24 @@ func main() {
 	}
 	rects := lo.Map(rows, common.NoIndex(ParseRect))
 	field := BuildField(rects)
+	field.FallAll()
 
-	for len(field.canFall) > 0 {
-		falling := field.canFall[len(field.canFall)-1]
-		field.canFall = field.canFall[:len(field.canFall)-1]
-		candidates := field.AboveRect(falling)
-		field.Fall(falling)
-		for _, c := range candidates {
-			if field.CanFall(c) {
-				field.canFall = append(field.canFall, c)
+	supportsMap, _, supportedBySingle := field.BuildSupportIndexes()
+
+	total := 0
+	for _, rect := range field.RectPts() {
+		rectSupports := supportsMap[rect]
+		willFall := make([]*Rect, 0)
+		for supports, _ := range rectSupports {
+			if _, exists := supportedBySingle[supports]; exists {
+				willFall = append(willFall, supports)
 			}
 		}
-	}
-
-	belowSet := make(map[*Rect]int)
-
-	for i, rect := range field.RectPts() {
-		below := field.UnderRect(rect)
-		if len(below) == 1 {
-			belowSet[below[0]] = i
+		if len(willFall) == 0 {
+			continue
 		}
+		total += field.ComputeFallenBricks(rect)
 	}
-	//fmt.Printf("%+v\n", len(belowSet))
-	fmt.Printf("Can be: %d", len(field.rects)-len(belowSet))
+
+	fmt.Printf("Will fall: %d", total)
 }
