@@ -38,6 +38,29 @@ type Directions struct {
 	Up, Down, Left, Right DirectionDesc
 }
 
+func (d Directions) IsSlope(slope rune) bool {
+	switch slope {
+	case '^', '<', '>', 'v':
+		return true
+	}
+	return false
+}
+
+func (d Directions) SlopeToDirection(slope rune) DirectionDesc {
+	switch slope {
+	case '^':
+		return d.Up
+	case '<':
+		return d.Left
+	case 'v':
+		return d.Down
+	case '>':
+		return d.Right // todo d.Right
+	}
+	log.Fatalf("Unreacheable")
+	return d.Left
+}
+
 func NewDirections() Directions {
 	dirs := Directions{
 		Up: DirectionDesc{
